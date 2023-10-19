@@ -12,24 +12,25 @@ type UpdateArticleBody = {
   shouldPublish: boolean;
 };
 
-const checkArguments = (
-  firstCommand: string,
-  secondCommand: string,
-  extension: string
-) => {
+const checkArguments = (): ArticleFilePath => {
+  const [firstCommand, secondCommand, thirdCommand] = process.argv;
+  if (thirdCommand === undefined) {
+    throw new Error(`Please provide article file path as third command`);
+  }
   if (
     !firstCommand.includes("ts-node") ||
     !secondCommand.includes("update-article.ts") ||
-    extension !== ".md"
+    !thirdCommand.includes(".md")
   ) {
     throw new Error(
       `Unexpected command: ${JSON.stringify({
         firstCommand,
         secondCommand,
-        extension: extension,
+        thirdCommand,
       })}`
     );
   }
+  return ArticleFilePath.CreateByFilePath(thirdCommand);
 };
 
 const updateArticle = async (
@@ -46,14 +47,12 @@ const updateArticle = async (
 };
 
 const main = async () => {
-  const [firstCommand, secondCommand, articleFilePath] = process.argv;
-  const filePath = ArticleFilePath.CreateByFilePath(articleFilePath);
-  checkArguments(firstCommand, secondCommand, filePath.extension);
+  const articleFilePath = checkArguments();
 
-  if (filePath.articleId === undefined) {
+  if (articleFilePath.articleId === undefined) {
     throw new Error("Article id must be included in file name");
   }
-  const content = fs.readFileSync(articleFilePath);
+  const content = fs.readFileSync(articleFilePath.filePath);
   const html = marked.parse(content.toString());
 
   // TODO: 記事に応じて書き換え
@@ -65,7 +64,7 @@ const main = async () => {
     shouldPublish: true,
   };
 
-  await updateArticle(filePath.articleId, body);
+  await updateArticle(articleFilePath.articleId, body);
 
   console.log(`🎉Successfully updated article !`);
 };
