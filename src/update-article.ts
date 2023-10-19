@@ -1,18 +1,15 @@
 import fs from "fs";
+import path from "path";
 import fetch, { Response } from "node-fetch";
 import { marked } from "marked";
 import { ArticleFilePath } from "./model/ArticleFilePath";
 
-type CreateArticleBody = {
+type UpdateArticleBody = {
   title: string;
   content: string;
   categoryId: string;
   tagNames: string[];
   shouldPublish: boolean;
-};
-
-type CreateArticleResponseBody = {
-  articleId: string;
 };
 
 const checkArguments = (
@@ -22,7 +19,7 @@ const checkArguments = (
 ) => {
   if (
     !firstCommand.includes("ts-node") ||
-    !secondCommand.includes("create-article.ts") ||
+    !secondCommand.includes("update-article.ts") ||
     extension !== ".md"
   ) {
     throw new Error(
@@ -35,10 +32,13 @@ const checkArguments = (
   }
 };
 
-const createArticle = async (body: CreateArticleBody): Promise<Response> => {
-  const url = "http://localhost:1323/article";
+const updateArticle = async (
+  articleId: string,
+  body: UpdateArticleBody
+): Promise<Response> => {
+  const url = `http://localhost:1323/article/${articleId}`;
   const result = await fetch(url, {
-    method: "POST",
+    method: "PUT",
     body: JSON.stringify(body),
     headers: { "Content-Type": "application/json" },
   });
@@ -47,36 +47,27 @@ const createArticle = async (body: CreateArticleBody): Promise<Response> => {
 
 const main = async () => {
   const [firstCommand, secondCommand, articleFilePath] = process.argv;
-  const originalFilePath = ArticleFilePath.CreateByFilePath(articleFilePath);
-  checkArguments(firstCommand, secondCommand, originalFilePath.extension);
+  const filePath = ArticleFilePath.CreateByFilePath(articleFilePath);
+  checkArguments(firstCommand, secondCommand, filePath.extension);
 
+  if (filePath.articleId === undefined) {
+    throw new Error("Article id must be included in file name");
+  }
   const content = fs.readFileSync(articleFilePath);
   const html = marked.parse(content.toString());
 
   // TODO: 記事に応じて書き換え
-  const body: CreateArticleBody = {
-    title: "タイトル3",
+  const body: UpdateArticleBody = {
+    title: "タイトル3Changed",
     content: html,
     categoryId: "298ba0bf-6a84-11ee-8ed1-0242ac160002",
-    tagNames: ["タグ１", "タグ２"],
-    shouldPublish: false,
+    tagNames: ["タグ１", "タグ２", "タグ３"],
+    shouldPublish: true,
   };
 
-  const res = await createArticle(body);
-  const responseBody = JSON.parse(
-    await res.text()
-  ) as CreateArticleResponseBody;
+  await updateArticle(filePath.articleId, body);
 
-  const { articleId } = responseBody;
-  const newFilePath = originalFilePath.createWithArticleId(articleId);
-  await fs.promises.rename(originalFilePath.filePath, newFilePath.filePath);
-
-  console.log(
-    `🎉Successfully created article !\n
-  Created article id is ${responseBody.articleId},\n
-  File name has been changed to ${newFilePath.fileName}
-  `
-  );
+  console.log(`🎉Successfully updated article !`);
 };
 
 main();
